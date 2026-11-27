@@ -97,7 +97,6 @@ object ExoPlayerBuilder {
             setParameters(
                 buildUponParameters()
                     .setMaxVideoSize(1920, 1080)
-                    .setForceHighestSupportedBitrate(true)
             )
         }
 
