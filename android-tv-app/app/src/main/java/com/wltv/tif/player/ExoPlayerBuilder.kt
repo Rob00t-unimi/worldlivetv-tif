@@ -53,7 +53,13 @@ object ExoPlayerBuilder {
 
                 val drmCallback = HttpMediaDrmCallback(licenseUrl, drmHttpFactory)
                 val drmSessionManager = DefaultDrmSessionManager.Builder()
-                    .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                    .setUuidAndExoMediaDrmProvider(C.WIDEVINE_UUID) { uuid ->
+                        FrameworkMediaDrm.newInstance(uuid).apply {
+                            // Force L3 on unlocked-bootloader devices (e.g. Firestick LineageOS)
+                            // where L1 *.secure hardware decoders fail.
+                            runCatching { setPropertyString("securityLevel", "L3") }
+                        }
+                    }
                     .build(drmCallback)
 
                 mediaSourceFactory.setDrmSessionManagerProvider { drmSessionManager }

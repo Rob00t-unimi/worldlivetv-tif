@@ -20,6 +20,20 @@ import org.json.JSONObject
 
 class WltvTvInputService : TvInputService() {
 
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate() {
+        super.onCreate()
+        serviceScope.launch {
+            runCatching { WltvBridge.checkHotfix(applicationContext) }
+        }
+    }
+
+    override fun onDestroy() {
+        serviceScope.cancel()
+        super.onDestroy()
+    }
+
     override fun onCreateSession(inputId: String): Session {
         return WltvSession(this)
     }

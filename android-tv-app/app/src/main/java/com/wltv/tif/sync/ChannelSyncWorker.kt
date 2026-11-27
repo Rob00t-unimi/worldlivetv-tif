@@ -9,6 +9,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.wltv.tif.bridge.WltvBridge
+import com.wltv.tif.bridge.WltvChannel
 import org.json.JSONObject
 
 class ChannelSyncWorker(
@@ -18,11 +19,20 @@ class ChannelSyncWorker(
 
     override suspend fun doWork(): Result {
         val inputId = inputData.getString(KEY_INPUT_ID) ?: return Result.failure()
-        val listUrl = inputData.getString(KEY_LIST_URL) ?: return Result.failure()
+        val listUrls = inputData.getStringArray(KEY_LIST_URLS)?.toList()
+            ?: inputData.getString(KEY_LIST_URL)?.let { listOf(it) }
+            ?: return Result.failure()
 
         return try {
             WltvBridge.checkHotfix(applicationContext)
-            val channels = WltvBridge.fetchChannels(applicationContext, listUrl)
+
+            val allChannels = ArrayList<WltvChannel>()
+            for (url in listUrls) {
+                if (url.isNotBlank()) {
+                    allChannels.addAll(WltvBridge.fetchChannels(applicationContext, url))
+                }
+            }
+
             val resolver = applicationContext.contentResolver
 
             // Clear existing channels (and cascade-deleted programs) for this input
@@ -34,7 +44,7 @@ class ChannelSyncWorker(
 
             val insertedIdsByTvgId = HashMap<String, Long>()
 
-            channels.forEachIndexed { index, ch ->
+            allChannels.forEachIndexed { index, ch ->
                 val providerData = JSONObject().apply {
                     put("broadcaster", ch.broadcaster)
                     put("channel", ch.channel)
@@ -86,7 +96,7 @@ class ChannelSyncWorker(
                 }
             }
 
-            Result.success(workDataOf(KEY_COUNT to channels.size))
+            Result.success(workDataOf(KEY_COUNT to allChannels.size))
         } catch (e: Exception) {
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: "Unknown sync error")))
         }
@@ -95,6 +105,7 @@ class ChannelSyncWorker(
     companion object {
         const val KEY_INPUT_ID = "input_id"
         const val KEY_LIST_URL = "list_url"
+        const val KEY_LIST_URLS = "list_urls"
         const val KEY_COUNT = "count"
         const val KEY_ERROR = "error"
     }
