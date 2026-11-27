@@ -8,6 +8,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.dash.DashMediaSource
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
@@ -16,6 +17,7 @@ import androidx.media3.exoplayer.drm.HttpMediaDrmCallback
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import com.wltv.tif.bridge.ResolvedStream
 import java.net.URLDecoder
 
@@ -81,9 +83,34 @@ object ExoPlayerBuilder {
     }
 
     @OptIn(UnstableApi::class)
+    fun createFastPlayer(context: Context): ExoPlayer {
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                15_000, // minBufferMs
+                30_000, // maxBufferMs
+                500,    // bufferForPlaybackMs (fast zapping)
+                1_500   // bufferForPlaybackAfterRebufferMs
+            )
+            .build()
+
+        val trackSelector = DefaultTrackSelector(context).apply {
+            setParameters(
+                buildUponParameters()
+                    .setMaxVideoSize(1920, 1080)
+                    .setForceHighestSupportedBitrate(true)
+            )
+        }
+
+        return ExoPlayer.Builder(context)
+            .setLoadControl(loadControl)
+            .setTrackSelector(trackSelector)
+            .build()
+    }
+
+    @OptIn(UnstableApi::class)
     fun buildAndPrepare(context: Context, stream: ResolvedStream): ExoPlayer {
         val source = buildMediaSource(stream)
-        return ExoPlayer.Builder(context).build().apply {
+        return createFastPlayer(context).apply {
             setMediaSource(source)
             prepare()
         }

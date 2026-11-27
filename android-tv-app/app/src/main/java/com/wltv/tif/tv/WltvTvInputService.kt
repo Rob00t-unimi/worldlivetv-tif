@@ -118,8 +118,9 @@ class WltvTvInputService : TvInputService() {
             // Subtitles can be toggled here via ExoPlayer track selection parameters
         }
 
+        @OptIn(UnstableApi::class)
         private fun getOrCreatePlayer(): ExoPlayer {
-            return player ?: ExoPlayer.Builder(context).build().apply {
+            return player ?: ExoPlayerBuilder.createFastPlayer(context).apply {
                 setVideoSurface(currentSurface)
                 volume = currentVolume
                 addListener(object : Player.Listener {
