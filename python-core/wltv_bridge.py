@@ -13,6 +13,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import requests
 
@@ -21,6 +22,7 @@ _DATA_DIR = ""
 _WLTV_DIR = ""
 _HTTP_CACHE = {}
 _ORIG_REQUESTS_GET = requests.get
+_VERIFY_MODE = False
 
 ADDON_REPO_BASE = "https://worldlivetv.github.io/repo"
 
@@ -33,6 +35,8 @@ _CACHEABLE_CATALOG_PATTERNS = (
 
 
 def _cached_requests_get(url, *args, **kwargs):
+    if _VERIFY_MODE and "timeout" not in kwargs:
+        kwargs["timeout"] = 4
     if any(pat in url for pat in _CACHEABLE_CATALOG_PATTERNS):
         now = time.time()
         entry = _HTTP_CACHE.get(url)
@@ -360,3 +364,49 @@ def resolve_channel(broadcaster: str, channel: str, list_name: str = "", group_i
         })
     except Exception as e:
         return json.dumps({"error": f"{type(e).__name__}: {e}"})
+
+
+def _is_channel_alive(ch: dict) -> bool:
+    try:
+        raw = resolve_channel(
+            ch.get("broadcaster", ""),
+            ch.get("channel", ""),
+            ch.get("listName", ""),
+            ch.get("groupId", ""),
+            ch.get("channelId", ""),
+        )
+        res = json.loads(raw)
+        url = res.get("url", "")
+        if res.get("error") or not url:
+            return False
+        headers = res.get("streamHeaders") or {}
+        with _ORIG_REQUESTS_GET(url, headers=headers, stream=True, timeout=4, allow_redirects=True) as r:
+            return r.status_code < 400
+    except Exception:
+        return False
+
+
+def filter_working_channels(channels_json: str, max_workers: int = 16) -> str:
+    """Tests channels in parallel and returns only those that resolve and respond HTTP < 400."""
+    global _VERIFY_MODE
+    init()
+    channels = json.loads(channels_json)
+    if not channels:
+        return "[]"
+
+    alive_flags = [False] * len(channels)
+    _VERIFY_MODE = True
+    try:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(_is_channel_alive, ch): idx for idx, ch in enumerate(channels)}
+            for fut in as_completed(futures):
+                idx = futures[fut]
+                try:
+                    alive_flags[idx] = fut.result()
+                except Exception:
+                    alive_flags[idx] = False
+    finally:
+        _VERIFY_MODE = False
+
+    working = [ch for ch, ok in zip(channels, alive_flags) if ok]
+    return json.dumps(working)

@@ -5,16 +5,22 @@ import android.media.tv.TvInputInfo
 import android.os.Bundle
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import java.util.concurrent.TimeUnit
 import com.wltv.tif.bridge.WltvBridge
 import com.wltv.tif.bridge.WltvList
 import com.wltv.tif.sync.ChannelBlacklist
@@ -43,6 +49,11 @@ class SetupActivity : AppCompatActivity() {
                 1f
             )
         }
+        val filterCheckBox = CheckBox(this).apply {
+            text = "Filter out offline/empty channels before adding"
+            isChecked = true
+            setPadding(16, 8, 16, 8)
+        }
         val syncButton = Button(this).apply {
             text = "Sync Selected Lists"
             isEnabled = false
@@ -63,6 +74,7 @@ class SetupActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             addView(title)
             addView(listView)
+            addView(filterCheckBox)
             addView(syncButton)
             addView(resetHiddenButton)
         }
@@ -101,20 +113,36 @@ class SetupActivity : AppCompatActivity() {
             }
 
             syncButton.isEnabled = false
-            syncButton.text = "Syncing..."
+            syncButton.text = if (filterCheckBox.isChecked) "Checking & Syncing (please wait)..." else "Syncing..."
+
+            val syncData = workDataOf(
+                ChannelSyncWorker.KEY_INPUT_ID to inputId,
+                ChannelSyncWorker.KEY_LIST_URLS to selectedUrls.toTypedArray(),
+                ChannelSyncWorker.KEY_LIST_IDS to selectedIds.toTypedArray(),
+                ChannelSyncWorker.KEY_FILTER_OFFLINE to filterCheckBox.isChecked
+            )
 
             val req = OneTimeWorkRequestBuilder<ChannelSyncWorker>()
-                .setInputData(
-                    workDataOf(
-                        ChannelSyncWorker.KEY_INPUT_ID to inputId,
-                        ChannelSyncWorker.KEY_LIST_URLS to selectedUrls.toTypedArray(),
-                        ChannelSyncWorker.KEY_LIST_IDS to selectedIds.toTypedArray()
-                    )
-                )
+                .setInputData(syncData)
                 .build()
 
             val wm = WorkManager.getInstance(this)
             wm.enqueue(req)
+
+            // Also schedule automatic 12-hour background sync for channels + EPG
+            val periodicReq = PeriodicWorkRequestBuilder<ChannelSyncWorker>(12, TimeUnit.HOURS)
+                .setInputData(syncData)
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build()
+                )
+                .build()
+            wm.enqueueUniquePeriodicWork(
+                "wltv_auto_sync",
+                ExistingPeriodicWorkPolicy.UPDATE,
+                periodicReq
+            )
             wm.getWorkInfoByIdLiveData(req.id).observe(this) { info ->
                 if (info?.state == WorkInfo.State.SUCCEEDED) {
                     val count = info.outputData.getInt(ChannelSyncWorker.KEY_COUNT, 0)

@@ -23,6 +23,7 @@ class ChannelSyncWorker(
             ?: return Result.failure()
         val listIds = inputData.getStringArray(KEY_LIST_IDS)?.toList()
             ?: List(listUrls.size) { "" }
+        val filterOffline = inputData.getBoolean(KEY_FILTER_OFFLINE, true)
 
         return try {
             WltvBridge.checkHotfix(applicationContext)
@@ -47,7 +48,7 @@ class ChannelSyncWorker(
                     5000 + (otherBlockIdx++ * 1000)
                 }
 
-                val channels = WltvBridge.fetchChannels(applicationContext, url)
+                val channels = WltvBridge.fetchChannels(applicationContext, url, filterOffline = filterOffline)
                 var localIdx = 0
 
                 for (ch in channels) {
@@ -152,6 +153,7 @@ class ChannelSyncWorker(
         const val KEY_LIST_URL = "list_url"
         const val KEY_LIST_URLS = "list_urls"
         const val KEY_LIST_IDS = "list_ids"
+        const val KEY_FILTER_OFFLINE = "filter_offline"
         const val KEY_COUNT = "count"
         const val KEY_ERROR = "error"
     }

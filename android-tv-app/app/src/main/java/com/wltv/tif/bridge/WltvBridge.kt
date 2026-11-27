@@ -94,8 +94,16 @@ object WltvBridge {
         }
     }
 
-    suspend fun fetchChannels(context: Context, m3uUrl: String): List<WltvChannel> = withContext(Dispatchers.IO) {
-        val raw = getModule(context).callAttr("fetch_m3u_channels", m3uUrl).toString()
+    suspend fun fetchChannels(
+        context: Context,
+        m3uUrl: String,
+        filterOffline: Boolean = false
+    ): List<WltvChannel> = withContext(Dispatchers.IO) {
+        val mod = getModule(context)
+        var raw = mod.callAttr("fetch_m3u_channels", m3uUrl).toString()
+        if (filterOffline) {
+            raw = mod.callAttr("filter_working_channels", raw, 16).toString()
+        }
         val arr = JSONArray(raw)
         buildList {
             for (i in 0 until arr.length()) {
