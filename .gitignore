@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+python-core/data/
+
+# Android / Gradle
+android-tv-app/.gradle/
+android-tv-app/local.properties
+android-tv-app/build/
+android-tv-app/app/build/
+android-tv-app/.idea/
+*.iml
+*.apk
+*.aab
+.DS_Store
+Thumbs.db

@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<addon id="plugin.video.wltvhelper"
+       name="World Live TV"
+       version="1.2.14"
+       provider-name="WLTV Group">
+  <requires>
+    <import addon="xbmc.python" version="3.0.0"/>
+    <import addon="script.module.requests" version="2.12.4"/>
+    <!--<import addon="script.module.pyqrcode" version="1.2.1+matrix.1"/>-->
+    <import addon="script.module.routing" version="0.2.0"/>
+    <import addon="script.module.inputstreamhelper" version="0.5.2"/>
+  </requires>
+  <extension point="xbmc.python.pluginsource" library="default.py">
+    <provides>video</provides>
+  </extension>
+  <extension point="kodi.context.item">
+    <menu id="kodi.core.main">
+      <item library="switch.py">
+        <label>30129</label>
+        <visible>!String.IsEmpty(ListItem.ChannelName)</visible>
+      </item>
+      <item library="worldtvonpvr.py">
+        <label>30125</label>
+        <visible>String.Contains(ListItem.FolderPath, "switchlist")</visible>
+      </item>
+    </menu>
+  </extension>
+  <extension point="xbmc.addon.metadata">
+    <platform>all</platform>
+
+    <summary lang="it_IT">Canali TV e radio gratuiti del DTT e del Web</summary>
+    <description lang="it_IT">I canali radio e tv in diretta del DTT e del Web compresi i regionali a portata di mano nella sezione TV di Kodi, la guida TV degli ultimi 7 giorni per i principali canali TV, molti canali internazionali allinterno dell'addon e, molto altro...
+    </description>
+
+    <summary lang="en_GB">Free DTT and Web TV and radio channels</summary>
+    <description lang="en_GB">Live radio and TV channels from DTT and the Web including regional ones at your fingertips in the Kodi TV section, the last 7 days TV guide for the main TV channels, many international channels within the addon and, much more...
+    </description>
+
+    <assets>
+      <icon>resources/images/wltv-logo.gif</icon>
+      <fanart>resources/images/wltv-background.png</fanart>
+      <screenshot>resources/images/screen1.png</screenshot>
+      <screenshot>resources/images/screen2.png</screenshot>
+      <screenshot>resources/images/screen3.png</screenshot>
+    </assets>
+    
+    <news>
+      v 1.2.14
+      - more timeout on check server on line
+      - fix EPG on first installation
+      - fix EPG if more db files
+      - sort TGR choices
+      - fix SkyLineWebcam
+      - add 7gold emilia
+      - fix Teletruria
+      - various fix for new tool adjustment
+      - youtube music search
+      - add castr broadcaster
+      - fix saiuz
+      - add delay discovery on settings
+      - fix siscione regionals channels
+      - fix discovery channels
+      - freezes discovery fix
+      - new epg reload and speedup
+      - another discovery fix
+      - another discovery fix
+      - removed wrong widevine message
+      - partial discovery fix
+      - Fix some regionals
+      - Widevine check
+      - fix sportitalia
+      - Fix some regionals
+      - Fix Reload EPG Label in settings
+      - Fix some regionals
+      - Rai3 play other specific region streams
+      - choose rai mpd or hls
+      - fix log link
+      - converted settings.xml to new version
+      - unused code cleanup
+      - fix kodi log uploader
+      - added premio broadcaster to fix some channels
+      - fix sciscione channels adding relative broadcarter
+      - sped up rai zapping
+      - sped up discovery zapping
+      - Add Abu Dhabi TV
+      - mediaset refactoring, sped up mediaset zapping, added credentials management
+      - samsung broadcaster
+      - fix Rai FHD
+      - fix checkServerOnline bug
+      - log offline server
+      v 1.2.13
+      - epg lock evidence
+      - improved epg reload
+      - minor code refactoring
+      - some regionals fixes
+      - fix bike channel
+      - fix xbox error on load plugin
+      - fix ftp def
+      - fix for some skyline webcams
+      - fix addMenuItem icons
+      - fix bozz
+      - functions improvement
+      - added restream helper, teletruria, 50canale
+      - fix supertennis
+      - fix server epg KO
+      - unitedmusic disabled
+      - catch error on installWidevine with message
+      - title on Rai TGR
+      - fix BikeChannel
+      - fix Pluto
+      - fix webcam
+      - fix rsi
+      - added check if is in italy functions
+      - fix discovery bug
+      - refactoring header origin and referer
+      - improved Inputstream adaptive settings
+      - fix rai TGR
+      - improved Rai
+      - check unsupported kodi version
+      - code refactoring on la7 and mediaset
+      - fix kodi 20 compatibility
+      - force reload epg function
+      - code refactoring for listswitch
+      v 1.2.12
+      - No AI MediaType
+      - Improved Stream and Manifest Headers management for IA
+      - Improved Rai drm management
+      - Fix discovery
+      - Fix WLTV Instance not found
+      - Force reload epg function
+      - Code refactoring for listswitch
+      - Log on mediaset
+      - Improved check epg file validity
+    </news>
+    
+    <disclaimer></disclaimer>
+    <platform>all</platform>
+    <license>GPL-3.0-or-later</license>
+    <forum>https://t.me/worldlivetv</forum>
+    <website>https://WorldLiveTV.github.io/</website>
+    <source></source>
+  </extension>
+</addon>
