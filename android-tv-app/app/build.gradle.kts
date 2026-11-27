@@ -49,7 +49,7 @@ chaquopy {
     }
     sourceSets {
         getByName("main") {
-            srcDir("../python-core")
+            srcDir("../../python-core")
         }
     }
 }
