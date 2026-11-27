@@ -146,10 +146,7 @@ class WltvTvInputService : TvInputService() {
             ChannelBlacklist.hide(context, key)
             scope.launch(Dispatchers.IO) {
                 runCatching {
-                    val values = ContentValues().apply {
-                        put(TvContract.Channels.COLUMN_BROWSABLE, 0)
-                    }
-                    context.contentResolver.update(uri, values, null, null)
+                    context.contentResolver.delete(uri, null, null)
                 }
             }
         }

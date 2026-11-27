@@ -75,7 +75,6 @@ class ChannelSyncWorker(
                         put(TvContract.Channels.COLUMN_ORIGINAL_NETWORK_ID, baseOffset + localIdx)
                         put(TvContract.Channels.COLUMN_TYPE, TvContract.Channels.TYPE_OTHER)
                         put(TvContract.Channels.COLUMN_SERVICE_TYPE, TvContract.Channels.SERVICE_TYPE_AUDIO_VIDEO)
-                        put(TvContract.Channels.COLUMN_BROWSABLE, 1)
                         put(TvContract.Channels.COLUMN_INTERNAL_PROVIDER_DATA, providerData)
                     }
                     val uri = resolver.insert(TvContract.Channels.CONTENT_URI, values)
