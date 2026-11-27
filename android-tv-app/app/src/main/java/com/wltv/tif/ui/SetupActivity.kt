@@ -39,8 +39,8 @@ class SetupActivity : AppCompatActivity() {
         inputId = intent.getStringExtra(TvInputInfo.EXTRA_INPUT_ID).orEmpty()
 
         val title = TextView(this).apply {
-            text = "Select WorldLiveTV lists to sync (DTT: 1-999, Reg: 1000+, Pluto: 2000+, Samsung: 3000+, Rakuten: 4000+)"
-            textSize = 18f
+            text = "Select WorldLiveTV lists to sync"
+            textSize = 20f
             setPadding(32, 24, 32, 12)
         }
         val listView = ListView(this).apply {
@@ -96,7 +96,7 @@ class SetupActivity : AppCompatActivity() {
                 if (fresh.isNotEmpty()) {
                     saveCachedLists(fresh)
                     if (lists.isEmpty()) {
-                        title.text = "Select WorldLiveTV lists to sync (DTT: 1-999, Reg: 1000+, Pluto: 2000+, Samsung: 3000+, Rakuten: 4000+)"
+                        title.text = "Select WorldLiveTV lists to sync"
                         applyListsToUi(fresh, listView, syncButton)
                     }
                 }
@@ -167,7 +167,7 @@ class SetupActivity : AppCompatActivity() {
 
     private fun applyListsToUi(items: List<WltvList>, listView: ListView, syncButton: Button) {
         lists = items
-        val names = lists.map { "${it.name} (${it.id})" }
+        val names = lists.map { it.name }
         listView.adapter = ArrayAdapter(
             this,
             android.R.layout.simple_list_item_multiple_choice,

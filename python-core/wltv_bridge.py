@@ -174,20 +174,40 @@ def check_hotfix() -> str:
 
 
 def get_remote_lists() -> str:
-    """Returns JSON list of available official WorldLiveTV lists."""
+    """Returns JSON list of available official WorldLiveTV lists quickly (without pre-downloading all M3U8s)."""
     init()
-    from lib import utils
-    custom_lists = utils.getRemoteLists()
+    from lib import config, utils
+    try:
+        items = requests.get(f"{utils.API_DOMAIN}/all.json", timeout=6).json()
+    except Exception:
+        # Fallback to full utils.getRemoteLists() (uses local cache if offline)
+        custom_lists = utils.getRemoteLists()
+        out = []
+        for cl in custom_lists:
+            m3u = cl.Lists[0] if cl.Lists else None
+            out.append({
+                "id": cl.Id,
+                "name": cl.Name,
+                "type": str(cl.TypeOfList),
+                "url": utils.computeListUrl(cl) if str(cl.TypeOfList) != "ListType.Emergency" else (m3u.List if m3u else ""),
+                "epg": utils.EPG_URL,
+            })
+        return json.dumps(out)
+
+    api_key = utils.getApikeyParameter()
     out = []
-    for cl in custom_lists:
-        m3u = cl.Lists[0] if cl.Lists else None
-        out.append({
-            "id": cl.Id,
-            "name": cl.Name,
-            "type": str(cl.TypeOfList),
-            "url": utils.computeListUrl(cl) if str(cl.TypeOfList) != "ListType.Emergency" else (m3u.List if m3u else ""),
-            "epg": utils.EPG_URL,
-        })
+    for item in items:
+        tags = item.get("Tags") or []
+        enabled = item.get("Enabled", False)
+        if (enabled or config.isDEV() or config.isBeta()) and utils.TAG_ADDON_KODILIST in tags:
+            list_id = item.get("Name", "")
+            out.append({
+                "id": list_id,
+                "name": item.get("DisplayName") or list_id,
+                "type": "ListType.Official",
+                "url": f"{utils.API_DOMAIN}/{list_id}/list.m3u8?{api_key}",
+                "epg": utils.EPG_URL,
+            })
     return json.dumps(out)
 
 

@@ -37,15 +37,17 @@ class ChannelSyncWorker(
 
             val insertedIdsByTvgId = HashMap<String, Long>()
             var totalInserted = 0
-            var otherBlockIdx = 0
+            var dynamicBlockIndex = 1
 
             for (i in listUrls.indices) {
                 val url = listUrls[i]
                 if (url.isBlank()) continue
 
                 val listId = listIds.getOrElse(i) { "" }
-                val baseOffset = sectionOffsetFor(listId) {
-                    5000 + (otherBlockIdx++ * 1000)
+                val baseOffset = if (listId.equals("_dtt_kodi", ignoreCase = true)) {
+                    0
+                } else {
+                    dynamicBlockIndex++ * 1000
                 }
 
                 val channels = WltvBridge.fetchChannels(applicationContext, url, filterOffline = filterOffline)
@@ -117,19 +119,6 @@ class ChannelSyncWorker(
             Result.success(workDataOf(KEY_COUNT to totalInserted))
         } catch (e: Exception) {
             Result.failure(workDataOf(KEY_ERROR to (e.message ?: "Unknown sync error")))
-        }
-    }
-
-    private inline fun sectionOffsetFor(listId: String, nextOtherOffset: () -> Int): Int {
-        val id = listId.lowercase()
-        return when {
-            id == "_dtt_kodi" -> 0
-            id.contains("regional") -> 1000
-            id.contains("pluto") -> 2000
-            id.contains("samsung") -> 3000
-            id.contains("rakuten") -> 4000
-            id.contains("radio") -> 9000
-            else -> nextOtherOffset()
         }
     }
 
