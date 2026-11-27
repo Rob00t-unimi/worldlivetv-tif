@@ -26,6 +26,8 @@ import com.wltv.tif.bridge.WltvList
 import com.wltv.tif.sync.ChannelBlacklist
 import com.wltv.tif.sync.ChannelSyncWorker
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 class SetupActivity : AppCompatActivity() {
 
@@ -80,21 +82,25 @@ class SetupActivity : AppCompatActivity() {
         }
         setContentView(container)
 
+        // Show cached lists immediately so UI is instant even if a background sync is running
+        val cachedLists = loadCachedLists()
+        if (cachedLists.isNotEmpty()) {
+            applyListsToUi(cachedLists, listView, syncButton)
+        } else {
+            title.text = "Loading WorldLiveTV lists..."
+        }
+
         lifecycleScope.launch {
-            WltvBridge.checkHotfix(this@SetupActivity)
-            lists = WltvBridge.getRemoteLists(this@SetupActivity)
-            val names = lists.map { "${it.name} (${it.id})" }
-            listView.adapter = ArrayAdapter(
-                this@SetupActivity,
-                android.R.layout.simple_list_item_multiple_choice,
-                names
-            )
-            // Pre-select DTT by default if present
-            val dttIndex = lists.indexOfFirst { it.id == "_dtt_kodi" }
-            if (dttIndex >= 0) {
-                listView.setItemChecked(dttIndex, true)
+            runCatching {
+                val fresh = WltvBridge.getRemoteLists(this@SetupActivity)
+                if (fresh.isNotEmpty()) {
+                    saveCachedLists(fresh)
+                    if (lists.isEmpty()) {
+                        title.text = "Select WorldLiveTV lists to sync (DTT: 1-999, Reg: 1000+, Pluto: 2000+, Samsung: 3000+, Rakuten: 4000+)"
+                        applyListsToUi(fresh, listView, syncButton)
+                    }
+                }
             }
-            syncButton.isEnabled = lists.isNotEmpty()
         }
 
         syncButton.setOnClickListener {
@@ -157,5 +163,59 @@ class SetupActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun applyListsToUi(items: List<WltvList>, listView: ListView, syncButton: Button) {
+        lists = items
+        val names = lists.map { "${it.name} (${it.id})" }
+        listView.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_multiple_choice,
+            names
+        )
+        val dttIndex = lists.indexOfFirst { it.id == "_dtt_kodi" }
+        if (dttIndex >= 0) {
+            listView.setItemChecked(dttIndex, true)
+        }
+        syncButton.isEnabled = lists.isNotEmpty()
+    }
+
+    private fun saveCachedLists(items: List<WltvList>) {
+        val arr = JSONArray()
+        for (item in items) {
+            arr.put(JSONObject().apply {
+                put("id", item.id)
+                put("name", item.name)
+                put("type", item.type)
+                put("url", item.url)
+                put("epg", item.epg)
+            })
+        }
+        getSharedPreferences("wltv_setup_cache", MODE_PRIVATE)
+            .edit()
+            .putString("lists_json", arr.toString())
+            .apply()
+    }
+
+    private fun loadCachedLists(): List<WltvList> {
+        val raw = getSharedPreferences("wltv_setup_cache", MODE_PRIVATE)
+            .getString("lists_json", null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val obj = arr.getJSONObject(i)
+                    add(
+                        WltvList(
+                            id = obj.optString("id"),
+                            name = obj.optString("name"),
+                            type = obj.optString("type"),
+                            url = obj.optString("url"),
+                            epg = obj.optString("epg")
+                        )
+                    )
+                }
+            }
+        }.getOrDefault(emptyList())
     }
 }
