@@ -10,6 +10,7 @@ import lzma
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timezone
@@ -18,8 +19,30 @@ import requests
 _INITIALIZED = False
 _DATA_DIR = ""
 _WLTV_DIR = ""
+_HTTP_CACHE = {}
+_ORIG_REQUESTS_GET = requests.get
 
 ADDON_REPO_BASE = "https://worldlivetv.github.io/repo"
+
+_CACHEABLE_CATALOG_PATTERNS = (
+    "api.pluto.tv/v2/channels.json",
+    "public.aurora.enhanced.live/site/configurations",
+    "feed.entertainment.tv.theplatform.eu/f/PR1GhC/mediaset-prod-all-stations",
+    "www.raiplay.it/dirette.json",
+)
+
+
+def _cached_requests_get(url, *args, **kwargs):
+    if any(pat in url for pat in _CACHEABLE_CATALOG_PATTERNS):
+        now = time.time()
+        entry = _HTTP_CACHE.get(url)
+        if entry and (now - entry[0]) < 600:
+            return entry[1]
+        resp = _ORIG_REQUESTS_GET(url, *args, **kwargs)
+        if resp.status_code == 200:
+            _HTTP_CACHE[url] = (now, resp)
+        return resp
+    return _ORIG_REQUESTS_GET(url, *args, **kwargs)
 
 
 def init(data_dir: str = "", wltv_dir: str = ""):
@@ -46,6 +69,7 @@ def init(data_dir: str = "", wltv_dir: str = ""):
         if os.path.isdir(d) and d not in sys.path:
             sys.path.insert(0, d)
 
+    requests.get = _cached_requests_get
     _INITIALIZED = True
 
 

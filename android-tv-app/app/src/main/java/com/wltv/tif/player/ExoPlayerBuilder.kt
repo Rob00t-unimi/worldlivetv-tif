@@ -22,7 +22,7 @@ import java.net.URLDecoder
 object ExoPlayerBuilder {
 
     @OptIn(UnstableApi::class)
-    fun buildAndPrepare(context: Context, stream: ResolvedStream): ExoPlayer {
+    fun buildMediaSource(stream: ResolvedStream): MediaSource {
         val headers = HashMap<String, String>().apply {
             putAll(stream.manifestHeaders)
             putAll(stream.streamHeaders)
@@ -77,8 +77,14 @@ object ExoPlayerBuilder {
             .apply { if (mimeType != null) setMimeType(mimeType) }
             .build()
 
+        return mediaSourceFactory.createMediaSource(mediaItem)
+    }
+
+    @OptIn(UnstableApi::class)
+    fun buildAndPrepare(context: Context, stream: ResolvedStream): ExoPlayer {
+        val source = buildMediaSource(stream)
         return ExoPlayer.Builder(context).build().apply {
-            setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+            setMediaSource(source)
             prepare()
         }
     }

@@ -1,15 +1,20 @@
 package com.wltv.tif.tv
 
+import android.content.ContentValues
 import android.content.Context
 import android.media.tv.TvContract
 import android.media.tv.TvInputManager
 import android.media.tv.TvInputService
 import android.net.Uri
 import android.view.Surface
+import androidx.annotation.OptIn
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.wltv.tif.bridge.WltvBridge
 import com.wltv.tif.player.ExoPlayerBuilder
+import com.wltv.tif.sync.ChannelBlacklist
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,11 +49,14 @@ class WltvTvInputService : TvInputService() {
         private var player: ExoPlayer? = null
         private var currentSurface: Surface? = null
         private var currentVolume: Float = 1.0f
+        private var currentChannelUri: Uri? = null
+        private var currentChannelKey: String? = null
 
         override fun onRelease() {
             tuneJob?.cancel()
             scope.cancel()
-            releasePlayer()
+            player?.release()
+            player = null
         }
 
         override fun onSetSurface(surface: Surface?): Boolean {
@@ -62,7 +70,9 @@ class WltvTvInputService : TvInputService() {
             player?.volume = volume
         }
 
+        @OptIn(UnstableApi::class)
         override fun onTune(channelUri: Uri): Boolean {
+            currentChannelUri = channelUri
             notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_TUNING)
             tuneJob?.cancel()
             tuneJob = scope.launch {
@@ -72,42 +82,76 @@ class WltvTvInputService : TvInputService() {
                     return@launch
                 }
 
+                val broadcaster = meta.optString("broadcaster")
+                val channel = meta.optString("channel")
+                val listName = meta.optString("listName")
+                val groupId = meta.optString("groupId")
+                val channelId = meta.optString("channelId")
+                currentChannelKey = ChannelBlacklist.keyFor(broadcaster, channel, channelId)
+
                 val resolved = WltvBridge.resolveChannel(
                     context = context,
-                    broadcaster = meta.optString("broadcaster"),
-                    channel = meta.optString("channel"),
-                    listName = meta.optString("listName"),
-                    groupId = meta.optString("groupId"),
-                    channelId = meta.optString("channelId")
+                    broadcaster = broadcaster,
+                    channel = channel,
+                    listName = listName,
+                    groupId = groupId,
+                    channelId = channelId
                 )
 
                 if (resolved.error.isNotBlank() || resolved.url.isBlank()) {
+                    markCurrentChannelBroken()
                     notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
                     return@launch
                 }
 
-                releasePlayer()
-                val exo = ExoPlayerBuilder.buildAndPrepare(context, resolved).apply {
-                    setVideoSurface(currentSurface)
-                    volume = currentVolume
-                    playWhenReady = true
-                    addListener(object : Player.Listener {
-                        override fun onPlaybackStateChanged(playbackState: Int) {
-                            if (playbackState == Player.STATE_READY) {
-                                notifyVideoAvailable()
-                            } else if (playbackState == Player.STATE_BUFFERING) {
-                                notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING)
-                            }
-                        }
-                    })
-                }
-                player = exo
+                val mediaSource = ExoPlayerBuilder.buildMediaSource(resolved)
+                val exo = getOrCreatePlayer()
+                exo.stop()
+                exo.setMediaSource(mediaSource)
+                exo.prepare()
+                exo.playWhenReady = true
             }
             return true
         }
 
         override fun onSetCaptionEnabled(enabled: Boolean) {
             // Subtitles can be toggled here via ExoPlayer track selection parameters
+        }
+
+        private fun getOrCreatePlayer(): ExoPlayer {
+            return player ?: ExoPlayer.Builder(context).build().apply {
+                setVideoSurface(currentSurface)
+                volume = currentVolume
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        if (playbackState == Player.STATE_READY) {
+                            notifyVideoAvailable()
+                        } else if (playbackState == Player.STATE_BUFFERING) {
+                            notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_BUFFERING)
+                        }
+                    }
+
+                    override fun onPlayerError(error: PlaybackException) {
+                        markCurrentChannelBroken()
+                        notifyVideoUnavailable(TvInputManager.VIDEO_UNAVAILABLE_REASON_UNKNOWN)
+                    }
+                })
+                player = this
+            }
+        }
+
+        private fun markCurrentChannelBroken() {
+            val key = currentChannelKey ?: return
+            val uri = currentChannelUri ?: return
+            ChannelBlacklist.hide(context, key)
+            scope.launch(Dispatchers.IO) {
+                runCatching {
+                    val values = ContentValues().apply {
+                        put(TvContract.Channels.COLUMN_BROWSABLE, 0)
+                    }
+                    context.contentResolver.update(uri, values, null, null)
+                }
+            }
         }
 
         private fun loadChannelMeta(channelUri: Uri): JSONObject? {
@@ -119,11 +163,6 @@ class WltvTvInputService : TvInputService() {
                 }
             }
             return null
-        }
-
-        private fun releasePlayer() {
-            player?.release()
-            player = null
         }
     }
 }

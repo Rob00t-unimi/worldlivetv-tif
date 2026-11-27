@@ -17,6 +17,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.wltv.tif.bridge.WltvBridge
 import com.wltv.tif.bridge.WltvList
+import com.wltv.tif.sync.ChannelBlacklist
 import com.wltv.tif.sync.ChannelSyncWorker
 import kotlinx.coroutines.launch
 
@@ -30,8 +31,8 @@ class SetupActivity : AppCompatActivity() {
         inputId = intent.getStringExtra(TvInputInfo.EXTRA_INPUT_ID).orEmpty()
 
         val title = TextView(this).apply {
-            text = "Select one or more WorldLiveTV lists to sync with Live Channels"
-            textSize = 20f
+            text = "Select WorldLiveTV lists to sync (DTT: 1-999, Reg: 1000+, Pluto: 2000+, Samsung: 3000+, Rakuten: 4000+)"
+            textSize = 18f
             setPadding(32, 24, 32, 12)
         }
         val listView = ListView(this).apply {
@@ -46,12 +47,24 @@ class SetupActivity : AppCompatActivity() {
             text = "Sync Selected Lists"
             isEnabled = false
         }
+        val resetHiddenButton = Button(this).apply {
+            val hiddenCount = ChannelBlacklist.count(this@SetupActivity)
+            text = "Restore Hidden Channels ($hiddenCount)"
+            isEnabled = hiddenCount > 0
+            setOnClickListener {
+                ChannelBlacklist.clearAll(this@SetupActivity)
+                text = "Restore Hidden Channels (0)"
+                isEnabled = false
+                Toast.makeText(this@SetupActivity, "Hidden channels cleared", Toast.LENGTH_SHORT).show()
+            }
+        }
 
         val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(title)
             addView(listView)
             addView(syncButton)
+            addView(resetHiddenButton)
         }
         setContentView(container)
 
@@ -75,9 +88,11 @@ class SetupActivity : AppCompatActivity() {
         syncButton.setOnClickListener {
             val checked = listView.checkedItemPositions
             val selectedUrls = ArrayList<String>()
+            val selectedIds = ArrayList<String>()
             for (i in lists.indices) {
                 if (checked.get(i)) {
                     selectedUrls.add(lists[i].url)
+                    selectedIds.add(lists[i].id)
                 }
             }
             if (selectedUrls.isEmpty()) {
@@ -92,7 +107,8 @@ class SetupActivity : AppCompatActivity() {
                 .setInputData(
                     workDataOf(
                         ChannelSyncWorker.KEY_INPUT_ID to inputId,
-                        ChannelSyncWorker.KEY_LIST_URLS to selectedUrls.toTypedArray()
+                        ChannelSyncWorker.KEY_LIST_URLS to selectedUrls.toTypedArray(),
+                        ChannelSyncWorker.KEY_LIST_IDS to selectedIds.toTypedArray()
                     )
                 )
                 .build()
